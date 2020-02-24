@@ -1,0 +1,4 @@
+*
+!*/
+!lib/coq/theories/**/*.v
+!lib/coq/user-contrib/**/*.v

@@ -1,0 +1,3 @@
+[submodule "iris-examples"]
+	path = iris-examples
+	url = https://gitlab.mpi-sws.org/iris/examples
