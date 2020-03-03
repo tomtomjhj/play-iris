@@ -3,22 +3,6 @@ From iris.program_logic Require Import atomic.
 From iris.base_logic.lib Require Import invariants.
 From iris.heap_lang Require Import proofmode notation.
 From iris.algebra Require Import excl auth list frac_auth gmap gset.
-
-Inductive op := Push of valO | Pop of valO.
-(* TODO: vs. (before, after) *)
-Canonical Structure opO := leibnizO op.
-
-Class histG Σ := HistG {
-  hist_inG :> inG Σ (frac_authR (gmapUR nat (exclR opO)))
-}.
-
-Definition histΣ : gFunctors :=
-  (* #[GFunctor (frac_authR (gmapUR nat (exclR (listO valO))))]. *)
-  #[GFunctor (frac_authR (gset_disjUR nat))].
-
-Instance subG_histΣ {Σ} : subG histΣ Σ → histG Σ.
-Proof. solve_inG. Qed.
-
 Section spec.
   Context `{!heapG Σ, !stackG Σ, !histG Σ}.
 

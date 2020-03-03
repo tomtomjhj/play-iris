@@ -10,3 +10,7 @@ make build-dep
 opam pin add iris-examples
 make -j
 ```
+
+# Note
+
+* `/docs/proof_guide.md`
