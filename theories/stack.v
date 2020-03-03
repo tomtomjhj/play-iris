@@ -4,13 +4,12 @@ From iris.base_logic.lib Require Import invariants.
 From iris.heap_lang Require Import proofmode notation.
 From iris.algebra Require Import excl auth list frac_auth gmap gset.
 
-(* TODO:
-   - necessity of timestamp?
-   - t ↦ (before, after)
- *)
+Inductive op := Push of valO | Pop of valO.
+(* TODO: vs. (before, after) *)
+Canonical Structure opO := leibnizO op.
+
 Class histG Σ := HistG {
-  (* hist_inG :> inG Σ (frac_authR (gmapUR nat (exclR (listO valO)))) *)
-  hist_inG :> inG Σ (frac_authR (gset_disjUR nat))
+  hist_inG :> inG Σ (frac_authR (gmapUR nat (exclR opO)))
 }.
 
 Definition histΣ : gFunctors :=
