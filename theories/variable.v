@@ -11,10 +11,10 @@ Section var.
   Definition new : val := λ: "v", ref "v".
   Definition set : val := λ: "l" "x", "l" <- "x".
 
-  Definition is_hist l γh := inv N (∃ hs t v, (l ↦ v) ∗ hist γh hs t v).
+  Definition is_var_hist l γh := inv N (∃ hs t v, (l ↦ v) ∗ hist γh hs t).
 
   Lemma set_spec (l : loc) (γh : gname) (q : Qp) (v : val) :
-    is_hist l γh -∗
+    is_var_hist l γh -∗
     <<< ∀ hs, hist_snap γh q hs >>>
       set #l v @ ⊤ ∖ ↑N
     <<< ∃ (t : nat), hist_snap γh q (<[t := Excl v]> hs), RET #() >>>.

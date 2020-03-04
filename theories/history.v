@@ -17,53 +17,50 @@ Section History.
   Context `{!histG Σ}.
 
   (* init with <[0 := ...]> *)
-  Definition last_op (t : nat) a (hs : Hist) :=
-    (size hs = (S t)) ∧
-    (∀ t', t' ∈ (dom (gset nat) hs) → t' ≤ t) ∧
-    hs !! t = Some (Excl a).
+  Definition hist_gapless (t : nat) (hs : Hist) :=
+    (size hs = (S t)) ∧ (∀ t', t' ∈ (dom (gset nat) hs) → t' ≤ t).
 
-  Definition hist γh (hs : Hist) t a : iProp Σ :=
-    own γh (●F hs) ∗ ⌜last_op t a hs⌝.
+  Definition hist γh (hs : Hist) t : iProp Σ :=
+    own γh (●F hs) ∗ ⌜hist_gapless t hs⌝.
 
   Definition hist_snap γh q (hs : Hist) : iProp Σ := own γh (◯F{q} hs).
 
-  Lemma new_timestamp t a hs : last_op t a hs -> hs !! (S t) = None.
+  Lemma hist_fresh t hs : hist_gapless t hs -> hs !! (S t) = None.
   Proof.
-    intros (_ & Hmax & _).
+    intros [_ Hmax].
     rewrite -(not_elem_of_dom (D:=gset nat)) => H.
     specialize (Hmax (S t) H).
     lia.
   Qed.
 
-  Lemma new_op (t : nat) a b (hs : Hist) :
-    last_op t a hs -> last_op (S t) b (<[S t := Excl b]> hs).
+  Lemma hist_fresh_gapless (t : nat) a (hs : Hist) :
+    hist_gapless t hs -> hist_gapless (S t) (<[S t := Excl a]> hs).
   Proof.
-    intros (Hsize & Hmax & ?).
-    split; [|split]; last by rewrite lookup_insert.
+    intros [Hsize Hmax]. split.
     - rewrite <-Hsize. apply: map_size_insert. rewrite Hsize.
-      by apply: new_timestamp.
+      by apply: hist_fresh.
     - intros t'.
       rewrite dom_insert elem_of_union elem_of_singleton => [[/ltac:(lia)|Ht']].
       specialize (Hmax t' Ht'). lia.
   Qed.
 
-  Lemma hist_update γh q (hsM hs : Hist) t a b :
-    hist γh hsM t a -∗ hist_snap γh q hs ==∗
-         hist γh (<[S t:=Excl b]> hsM) (S t) b ∗ hist_snap γh q (<[S t:=Excl b]> hs).
+  Lemma hist_update γh q (hsM hs : Hist) t a :
+    hist γh hsM t -∗ hist_snap γh q hs ==∗
+         hist γh (<[S t:=Excl a]> hsM) (S t) ∗ hist_snap γh q (<[S t:=Excl a]> hs).
   Proof.
     rewrite /hist /hist_snap.
     iIntros "[H● %] H◯ ".
-    iMod (own_update_2 with "H● H◯") as "[H● H◯]".
-    { apply frac_auth_update, (alloc_local_update _ _ (S t) (Excl b)); last done.
-      by apply: new_timestamp. }
-    iFrame; iModIntro; iPureIntro. by apply: new_op.
+    iMod (own_update_2 with "H● H◯") as "[$ $]".
+    { apply frac_auth_update, alloc_local_update; last done.
+      by apply: hist_fresh. }
+    iModIntro; iPureIntro. by apply: hist_fresh_gapless.
   Qed.
 
   (* NOTE Timeless requires {!OfeDiscrete A}  *)
 End History.
 Typeclasses Opaque hist hist_snap.
 
-(* TODO: snapshot before/after. TODO: vs operation history *)
+(* TODO: vs operation history *)
 Section History2.
   Context {A : ofeT}.
   Notation Hist2 := (gmapUR nat (exclR (prodO A A))).
@@ -75,6 +72,11 @@ Section History2.
   Instance subG_hist2Σ {Σ} : subG hist2Σ Σ → hist2G Σ.
   Proof. solve_inG. Qed.
 
-  (* TODO: well-formed *)
+  (* TODO:
+     - well-formed
+       - init with <[0:= (s,s)]>
+       - t, t+1 overlap
+     - gapless: indep to key type
+     - *)
 
 End History2.
