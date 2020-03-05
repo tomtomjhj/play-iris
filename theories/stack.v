@@ -73,5 +73,27 @@ Section spec.
   Admitted.
 End spec.
 
-Section client.
+From iris.heap_lang Require Import lib.par.
+Module client.
+  Definition produce (s ap: loc) : val :=
+    rec: "produce" "n" "i" :=
+      if: "i" = "n" then #()
+      else let: "e":= !(#ap +ₗ"i") in
+           push_stack "e" #s;;
+           "produce" "n" ("i" + #1).
+
+  Definition consume (s ac: loc) : val :=
+    rec: "consume" "n" "i" :=
+      if: "i" = "n" then #()
+      else match: pop_stack #s with
+             NONE => "consume" "n" "i"
+           | SOME "e" => (#ac + "i") <- "e";;
+                        "consume" "n" ("i" + #1)
+           end.
+
+  Definition exchange (s ap ac : loc) : val :=
+    λ: "n", (produce s ap) "n" #0 ||| (consume s ac) "n" #0.
+
+  (* ap ↦∗ ls ∗ ∃ ls', ac ↦∗ ls' ∗ ⌜Permutation ls ls'⌝ *)
+
 End client.
