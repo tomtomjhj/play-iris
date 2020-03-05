@@ -50,6 +50,12 @@ Section History.
       specialize (Hmax t' Ht'). lia.
   Qed.
 
+  Lemma hist_alloc : (|==> ∃ γh, hist γh ε O ∗ hist_snap γh 1 ε)%I.
+  Proof.
+    iMod (own_alloc (●F ε ⋅ ◯F{1} ε)) as (γh) "[Hγh● Hγh◯]"; first by apply frac_auth_valid.
+    iModIntro. iExists γh. iFrame. iPureIntro. exact hist_gapless0.
+  Qed.
+
   Lemma hist_update γh q (hsM hs : Hist) t a :
     hist γh hsM t -∗ hist_snap γh q hs ==∗
          hist γh (<[t:=Excl a]> hsM) (S t) ∗ hist_snap γh q (<[t:=Excl a]> hs).

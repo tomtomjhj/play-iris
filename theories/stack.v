@@ -31,52 +31,39 @@ Section spec.
   Notation is_stack := (is_stack stackN).
 
   Definition stack_histN := nroot .@ "stack_hist".
-  Definition stack_hist γs γh :=
-    inv stack_histN (∃ hs t ls, stack_cont γs ls ∗ hist γh hs t).
+  Definition stack_hist γh := inv stack_histN (∃ hs t, hist γh hs t).
 
   Lemma new_stack_spec_hist :
     {{{ True }}}
       new_stack #()
-    {{{ l γs γh, RET #l; is_stack l γs ∗ stack_hist γs γh ∗ hist_snap γh 1 ε }}}.
+    {{{ l γs γh, RET #l; is_stack l γs ∗ stack_cont γs [] ∗ stack_hist γh ∗ hist_snap γh 1 ε }}}.
   Proof.
     iIntros (Φ) "_ Post".
     iApply wp_fupd.
-    wp_lam. wp_alloc ℓ as "Hl".
-
-    iMod (own_alloc (● (Some (Excl [])) ⋅ ◯ (Some (Excl [])))) as (γs) "[Hγs● Hγs◯]";
-      first by apply auth_both_valid.
-    iMod (inv_alloc stackN _ (stack_inv ℓ γs) with "[Hl Hγs●]") as "#Stack".
-    { iNext. rewrite /stack_inv /phys_stack /phys_list.
-      iExists []. iFrame. iExists None. by iFrame. }
-
-    iMod (own_alloc (●F ε ⋅ ◯F{1} ε)) as (γh) "[Hγh● Hγh◯]"; first by apply frac_auth_valid.
-    iMod (inv_alloc stack_histN _
-                    (∃ hs t ls, stack_cont γs ls ∗ hist γh hs t)
-            with "[Hγs◯ Hγh●]") as "#Hist".
-    { iNext. iExists ε, O, []. rewrite /stack_cont /hist. iFrame. iPureIntro. apply hist_gapless0. }
-
-    iModIntro. iApply "Post". auto with iFrame.
+    iMod hist_alloc as (γh) "[Hγh● Hγh◯]".
+    iMod (inv_alloc stack_histN _ (∃ hs t, hist γh hs t) with "[Hγh●]") as "Hist"; first eauto.
+    wp_apply (new_stack_spec stackN); first done.
+    iIntros (l γs) "[Stack Sc] !>". iApply "Post". iFrame.
   Qed.
 
   Lemma push_stack_spec_hist (l : loc) (γs γh : gname) (v : val) :
-    is_stack l γs -∗ stack_hist γs γh -∗
-    <<< ∀ q hs, hist_snap γh q hs >>>
+    is_stack l γs -∗ stack_hist γh -∗
+    <<< ∀ xs q hs, stack_cont γs xs ∗ hist_snap γh q hs >>>
       push_stack v #l @ ⊤ ∖ ↑stackN ∖ ↑stack_histN
-    <<< ∃ t, hist_snap γh q (<[ t := Excl (Push v) ]> hs ), RET #() >>>.
+    <<< ∃ t, stack_cont γs (v::xs) ∗ hist_snap γh q (<[t := Excl (Push v)]> hs ), RET #() >>>.
   Proof.
     iIntros "#Stack #Hist" (Φ) "AU".
     awp_apply (push_stack_spec stackN with "Stack").
-    iInv stack_histN as (hsM tM lsM) ">[Hsc Hh]".
-    iAaccIntro with "Hsc".
-    { iIntros "Hsc !>". iSplitR "AU"; [eauto with iFrame|done]. }
-    iMod "AU" as (q hs) "[Hhs [_ Hclose]]".
+    iInv stack_histN as (hsM tM) ">Hh".
+    iApply (aacc_aupd_commit with "AU"); first solve_ndisj.
+    iIntros (xs q hs) "[Hsc Hhs]".
+    iAaccIntro with "Hsc"; first by auto 10 with iFrame.
     iMod (hist_update γh q hsM hs tM (Push v) with "Hh Hhs") as "[Hh Hhs]".
-    iMod ("Hclose" with "Hhs") as "$".
-    iIntros "Hsc !> !>". eauto with iFrame.
+    eauto 11 with iFrame.
   Qed.
 
   Lemma pop_stack_spec (l : loc) (γs γh : gname) :
-    is_stack l γs -∗ stack_hist γs γh -∗
+    is_stack l γs -∗ stack_hist γh -∗
     <<< ∀ q hs, hist_snap γh q hs >>>
       pop_stack #l @ ⊤ ∖ ↑stackN ∖ ↑stack_histN
     <<< ∃ t, hist_snap γh q (<[ t := Excl (Pop #()) ]> hs ), RET #() >>>.

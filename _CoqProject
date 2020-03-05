@@ -12,3 +12,4 @@
 
 theories/history.v
 theories/variable.v
+theories/stack.v

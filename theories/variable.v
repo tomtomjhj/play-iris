@@ -11,22 +11,22 @@ Section var.
   Definition new : val := λ: "v", ref "v".
   Definition set : val := λ: "l" "x", "l" <- "x".
 
-  Definition var_hist l γh := inv N (∃ hs t v, (l ↦ v) ∗ hist γh hs t).
+  Definition var_hist γh := inv N (∃ hs t, hist γh hs t).
 
   Lemma set_spec (l : loc) (γh : gname) (q : Qp) (v : val) :
-    var_hist l γh -∗
-    <<< ∀ hs, hist_snap γh q hs >>>
+    var_hist γh -∗
+    <<< ∀ w hs, l ↦ w ∗ hist_snap γh q hs >>>
       set #l v @ ⊤ ∖ ↑N
-    <<< ∃ (t : nat), hist_snap γh q (<[t := Excl v]> hs), RET #() >>>.
+    <<< ∃ (t : nat), l ↦ v ∗ hist_snap γh q (<[t := Excl v]> hs), RET #() >>>.
   Proof.
     iIntros "#Hist" (Φ) "AU". wp_lam; wp_let.
-    iInv N as (hsM t v') "[Hl H]".
-    iMod "AU" as (hs) "[H◯ [_ Hclose]]".
+    iInv N as (hsM t) "H".
+    iMod "AU" as (w hs) "[[Hl H◯] [_ Hclose]]".
     wp_store.
     iMod (hist_update with "H H◯") as "[H H◯]".
-    iMod ("Hclose" with "[H◯]") as "$"; first done.
+    iMod ("Hclose" with "[Hl H◯]") as "$"; first iFrame.
     iModIntro; iModIntro; iNext.
-    iExists (<[t:=Excl v]> hsM), (S t), v.
+    iExists (<[t:=Excl v]> hsM), (S t).
     iFrame.
   Qed.
 End var.
