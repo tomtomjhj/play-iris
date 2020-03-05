@@ -1,3 +1,4 @@
+From iris.bi Require Import lib.laterable.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Export excl auth frac_auth gmap gset updates local_updates.
 From iris.base_logic Require Export base_logic lib.own.
@@ -61,7 +62,11 @@ Section History.
     iModIntro; iPureIntro. by apply: hist_fresh_gapless.
   Qed.
 
-  (* NOTE Timeless requires {!OfeDiscrete A}  *)
+  (* Laterable is automatically derived.  *)
+  Global Instance hist_timeless `{!OfeDiscrete A} γh hs t  : Timeless (hist γh hs t).
+  Proof. apply _. Qed.
+  Global Instance hist_snap_timeless `{!OfeDiscrete A} γh q hs : Timeless (hist_snap γh q hs).
+  Proof. apply _. Qed.
 End History.
 Typeclasses Opaque hist hist_snap.
 

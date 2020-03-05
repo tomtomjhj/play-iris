@@ -1,44 +1,43 @@
-From iris_examples Require Import treiber2.
-From iris.program_logic Require Import atomic.
-From iris.base_logic.lib Require Import invariants.
-From iris.heap_lang Require Import proofmode notation.
+From iris.proofmode Require Import tactics.
 From iris.algebra Require Import excl auth list frac_auth gmap gset.
+From iris.base_logic.lib Require Import invariants.
+From iris.program_logic Require Import atomic.
+From iris.heap_lang Require Import proofmode notation.
+From iris_examples Require Import treiber2.
+From play Require Import history.
+
+Section stack_stuff.
+  Typeclasses Transparent is_stack stack_cont.
+  Context `{!heapG Σ, !stackG Σ}.
+  Global Instance is_stack_persistent N l γ : Persistent (is_stack N l γ).
+  Proof. apply _. Qed.
+  Global Instance stack_cont_laterable l γ : Laterable (stack_cont l γ).
+  Proof. apply _. Qed.
+  Global Instance stack_cont_timeless l γ : Timeless (stack_cont l γ).
+  Proof. apply _. Qed.
+  Typeclasses Opaque is_stack stack_cont.
+End stack_stuff.
+
+Section operation.
+  Inductive stack_op := Push of val | Pop of val.
+  Canonical Structure stack_opO := leibnizO stack_op.
+  (* TODO: linearizability stuff *)
+End operation.
+
 Section spec.
-  Context `{!heapG Σ, !stackG Σ, !histG Σ}.
+  Context `{!heapG Σ, !stackG Σ, !@histG stack_opO Σ} (N : namespace).
 
   Definition stackN := nroot .@ "stack".
   Notation is_stack := (is_stack stackN).
 
-  (* TODO apply _ doesn't work? *)
-  Global Instance is_stack_persistent l γ : Persistent (is_stack l γ).
-  Proof. apply inv_persistent. Qed.
-  Global Instance stack_cont_laterable l γ : Laterable (stack_cont l γ).
-  Proof.
-    apply timeless_laterable. apply own_timeless. apply auth_frag_discrete.
-    apply Some_discrete. apply Excl_discrete. apply ofe_discrete_discrete.
-  Qed.
-
-  Definition histN := nroot .@ "hist".
-  Definition hist_frag γh q ts := own γh (◯F{q} ts).
-  Definition hist_master γh ts := own γh (●F ts).
-
-  (* is_stack : stack_cont = auth mapsto : frag mapsto *)
-  Definition hist_inv γs γh : iProp Σ :=
-    (∃ ls, stack_cont γs ls) ∗ (∃ ts, hist_master γh ts).
-
-  Definition is_hist γs γh := inv histN (hist_inv γs γh).
-
-  Global Instance is_hist_persistent γs γh  : Persistent (is_hist γs γh).
-  Proof. apply _. Qed.
-  Global Instance hist_frag_laterable γh q ts : Laterable (hist_frag γh q ts).
-  Proof. apply _. Qed.
-  Global Instance hist_master_laterable γh ts : Laterable (hist_master γh ts).
-  Proof. apply _. Qed.
+  Definition stack_histN := nroot .@ "stack_hist".
+  Definition stack_hist γs γh :=
+    inv stack_histN (∃ hs t ls, stack_cont γs ls ∗ hist γh hs t).
 
   Lemma new_stack_spec_hist :
     {{{ True }}}
       new_stack #()
-    {{{ l γs γh, RET #l; is_stack l γs ∗ is_hist γs γh ∗ hist_frag γh 1 ε }}}.
+    {{{ l γs γh, RET #l; is_stack l γs ∗ stack_hist γs γh ∗ hist_snap γh 1 ε }}}.
   Proof.
     iIntros (Φ) "_ Post".
     iApply wp_fupd.
@@ -51,34 +50,41 @@ Section spec.
       iExists []. iFrame. iExists None. by iFrame. }
 
     iMod (own_alloc (●F ε ⋅ ◯F{1} ε)) as (γh) "[Hγh● Hγh◯]"; first by apply frac_auth_valid.
-    iMod (inv_alloc histN _ (hist_inv γs γh) with "[Hγs◯ Hγh●]") as "#Hist".
-    { iNext. rewrite /hist_inv. iSplitL "Hγs◯"; eauto. }
+    iMod (inv_alloc stack_histN _
+                    (∃ hs t ls, stack_cont γs ls ∗ hist γh hs t)
+            with "[Hγs◯ Hγh●]") as "#Hist".
+    { iNext. iExists ε, O, []. rewrite /stack_cont /hist. iFrame. iPureIntro. apply hist_gapless0. }
 
-    iModIntro. iApply "Post". eauto with iFrame.
+    iModIntro. iApply "Post". auto with iFrame.
   Qed.
 
-
   Lemma push_stack_spec_hist (l : loc) (γs γh : gname) (v : val) :
-    is_stack l γs -∗ is_hist γs γh -∗
-    <<< ∀ q ts, hist_frag γh q ts >>>
-      push_stack v #l @ ⊤  ∖ ↑histN (* TODO: what namespace? *)
-    (* <<< hist_frag γh q (ts ⋅ {[ t := [] ]}), RET #() >>>. *)
-    <<< ∃ t, hist_frag γh q (ts ⋅ GSet {[t]}), RET #() >>>.
+    is_stack l γs -∗ stack_hist γs γh -∗
+    <<< ∀ q hs, hist_snap γh q hs >>>
+      push_stack v #l @ ⊤ ∖ ↑stackN ∖ ↑stack_histN
+    <<< ∃ t, hist_snap γh q (<[ t := Excl (Push v) ]> hs ), RET #() >>>.
   Proof.
     iIntros "#Stack #Hist" (Φ) "AU".
     awp_apply (push_stack_spec stackN with "Stack").
-    (* TODO: stackN? *)
-    iInv histN as "[Hsc >Hhm]". iDestruct "Hhm" as (ts) "Hhm".
-    iAaccIntro with "Hhm".
+    iInv stack_histN as (hsM tM lsM) ">[Hsc Hh]".
+    iAaccIntro with "Hsc".
+    { iIntros "Hsc !>". iSplitR "AU"; [eauto with iFrame|done]. }
+    iMod "AU" as (q hs) "[Hhs [_ Hclose]]".
+    iMod (hist_update γh q hsM hs tM (Push v) with "Hh Hhs") as "[Hh Hhs]".
+    iMod ("Hclose" with "Hhs") as "$".
+    iIntros "Hsc !> !>". eauto with iFrame.
+  Qed.
 
-  Admitted.
-
-  Lemma pop_stack_spec (l : loc) (γs : gname) :
-    is_stack l γs -∗
-    <<< ∀ (xs : list val), stack_cont γs xs >>>
-      pop_stack #l @ ⊤ ∖ ↑stackN
-    <<< stack_cont γs (match xs with [] => [] | _::xs => xs end)
-      , RET (match xs with [] => NONEV | v::_ => SOMEV v end) >>>.
+  Lemma pop_stack_spec (l : loc) (γs γh : gname) :
+    is_stack l γs -∗ stack_hist γs γh -∗
+    <<< ∀ q hs, hist_snap γh q hs >>>
+      pop_stack #l @ ⊤ ∖ ↑stackN ∖ ↑stack_histN
+    <<< ∃ t, hist_snap γh q (<[ t := Excl (Pop #()) ]> hs ), RET #() >>>.
+    (* <<< stack_cont γs (match xs with [] => [] | _::xs => xs end)
+         , RET (match xs with [] => NONEV | v::_ => SOMEV v end) >>>. *)
   Proof.
   Admitted.
 End spec.
+
+Section client.
+End client.
