@@ -11,10 +11,10 @@ Section var.
   Definition new : val := λ: "v", ref "v".
   Definition set : val := λ: "l" "x", "l" <- "x".
 
-  Definition is_var_hist l γh := inv N (∃ hs t v, (l ↦ v) ∗ hist γh hs t).
+  Definition var_hist l γh := inv N (∃ hs t v, (l ↦ v) ∗ hist γh hs t).
 
   Lemma set_spec (l : loc) (γh : gname) (q : Qp) (v : val) :
-    is_var_hist l γh -∗
+    var_hist l γh -∗
     <<< ∀ hs, hist_snap γh q hs >>>
       set #l v @ ⊤ ∖ ↑N
     <<< ∃ (t : nat), hist_snap γh q (<[t := Excl v]> hs), RET #() >>>.
@@ -26,7 +26,7 @@ Section var.
     iMod (hist_update with "H H◯") as "[H H◯]".
     iMod ("Hclose" with "[H◯]") as "$"; first done.
     iModIntro; iModIntro; iNext.
-    iExists (<[S t:=Excl v]> hsM), (S t), v.
+    iExists (<[t:=Excl v]> hsM), (S t), v.
     iFrame.
   Qed.
 End var.

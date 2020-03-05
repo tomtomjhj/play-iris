@@ -16,29 +16,34 @@ Section History.
 
   Context `{!histG Σ}.
 
-  (* init with <[0 := ...]> *)
+  (* init with ε, t is the next timestamp *)
   Definition hist_gapless (t : nat) (hs : Hist) :=
-    (size hs = (S t)) ∧ (∀ t', t' ∈ (dom (gset nat) hs) → t' ≤ t).
+    (size hs = t) ∧ (∀ t', t' ∈ (dom (gset nat) hs) → t' < t).
 
   Definition hist γh (hs : Hist) t : iProp Σ :=
     own γh (●F hs) ∗ ⌜hist_gapless t hs⌝.
 
   Definition hist_snap γh q (hs : Hist) : iProp Σ := own γh (◯F{q} hs).
 
-  Lemma hist_fresh t hs : hist_gapless t hs -> hs !! (S t) = None.
+  Lemma hist_fresh t hs : hist_gapless t hs -> hs !! t = None.
   Proof.
     intros [_ Hmax].
     rewrite -(not_elem_of_dom (D:=gset nat)) => H.
-    specialize (Hmax (S t) H).
+    specialize (Hmax t H).
     lia.
   Qed.
 
-  Lemma hist_fresh_gapless (t : nat) a (hs : Hist) :
-    hist_gapless t hs -> hist_gapless (S t) (<[S t := Excl a]> hs).
+  Lemma hist_gapless0 : hist_gapless 0 ε.
   Proof.
-    intros [Hsize Hmax]. split.
-    - rewrite <-Hsize. apply: map_size_insert. rewrite Hsize.
-      by apply: hist_fresh.
+    split. apply: map_size_empty.
+    intro. by rewrite dom_empty elem_of_empty.
+  Qed.
+
+  Lemma hist_fresh_gapless (t : nat) a (hs : Hist) :
+    hist_gapless t hs -> hist_gapless (S t) (<[t := Excl a]> hs).
+  Proof.
+    intros Hg. inversion Hg as [Hsize Hmax]. split.
+    - move: ((hist_fresh t hs) Hg). rewrite -Hsize. apply: map_size_insert.
     - intros t'.
       rewrite dom_insert elem_of_union elem_of_singleton => [[/ltac:(lia)|Ht']].
       specialize (Hmax t' Ht'). lia.
@@ -46,7 +51,7 @@ Section History.
 
   Lemma hist_update γh q (hsM hs : Hist) t a :
     hist γh hsM t -∗ hist_snap γh q hs ==∗
-         hist γh (<[S t:=Excl a]> hsM) (S t) ∗ hist_snap γh q (<[S t:=Excl a]> hs).
+         hist γh (<[t:=Excl a]> hsM) (S t) ∗ hist_snap γh q (<[t:=Excl a]> hs).
   Proof.
     rewrite /hist /hist_snap.
     iIntros "[H● %] H◯ ".
