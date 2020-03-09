@@ -6,7 +6,8 @@ From iris.base_logic Require Export base_logic lib.own.
 (* snapshot history *)
 Section History.
   Context {A : ofeT}.
-  Notation Hist := (gmapUR nat (exclR A)).
+  (* TODO: natmap? listR? *)
+  Definition Hist := (gmapUR nat (exclR A)).
 
   Class histG Σ := HistG { hist_inG :> inG Σ (frac_authR Hist) }.
 
@@ -20,6 +21,7 @@ Section History.
   (* init with ε, t is the next timestamp *)
   Definition hist_gapless (t : nat) (hs : Hist) :=
     (size hs = t) ∧ (∀ t', t' ∈ (dom (gset nat) hs) → t' < t).
+    (* ∀ t', t' ∈ (dom (gset nat) hs) ↔ t' < t. *)
 
   Definition hist γh (hs : Hist) t : iProp Σ :=
     own γh (●F hs) ∗ ⌜hist_gapless t hs⌝.
@@ -32,7 +34,17 @@ Section History.
     rewrite -(not_elem_of_dom (D:=gset nat)) => H.
     specialize (Hmax t H).
     lia.
+    (* move=> Hg; move: (Hg t) => [Ht _].
+       rewrite -(not_elem_of_dom (D:=gset nat)) => H. move: (Ht H). lia. *)
   Qed.
+
+  (* Lemma hist_fresh' t hs : hist_gapless t hs -> ∀ t', hs !! t' = None ↔ t' ≥ t.
+     Proof.
+       intros Hf t'; inversion Hf as [Hsize Hmax].
+       move: (hist_fresh t hs Hf) => Ht. split.
+       - rewrite -(not_elem_of_dom (D:=gset nat)) => H.
+       -
+       *)
 
   Lemma hist_gapless0 : hist_gapless 0 ε.
   Proof.
